@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Генератор документов от Алексея Орфеева</title>
+    <!-- Подключение Tailwind CSS для стилизации -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Библиотека для создания скриншотов элементов (HTML в Canvas) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- Библиотека для создания ZIP-архивов -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- Библиотека для создания PDF-документов -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- Подключение шрифта Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5; /* Нейтральный фон */
+        }
+        /* ... существующие стили ... */
+        #message-box {
+            transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+        }
+        .preview-container {
+            transition: all 0.3s ease-in-out;
+            filter: blur(5px);
+            opacity: 0.5;
+            transform: scale(0.98);
+        }
+        .preview-container.visible {
+            filter: blur(0);
+            opacity: 1;
+            transform: scale(1);
+        }
+        .loading-img {
+            animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
+        @media print {
+            body { background-color: #fff; }
+            .no-print { display: none; }
+        }
+        #subscription-modal {
+            transition: opacity 0.3s ease-in-out;
+        }
+
+        /* Новые стили для реализма */
+        .watermark {
+            background-image: var(--watermark-url);
+            background-position: center;
+            background-repeat: no-repeat;
+            background-size: 60%;
+            opacity: 0.05;
+        }
+        .barcode {
+            background: repeating-linear-gradient(
+                to right,
+                #000 0, #000 1px, #fff 1px, #fff 2px,
+                #000 2px, #000 4px, #fff 4px, #fff 5px,
+                #000 5px, #000 6px, #fff 6px, #fff 8px,
+                #000 8px, #000 9px, #fff 9px, #fff 11px,
+                #000 11px, #000 12px, #fff 12px, #fff 13px
+            );
+            height: 30px;
+            width: 120px; /* Немного шире для реализма */
+        }
+        .barcode-alt {
+             background: repeating-linear-gradient(
+                to right,
+                #333,
+                #333 1px,
+                #fff 1px,
+                #fff 3px,
+                #333 3px,
+                #333 4px,
+                #fff 4px,
+                #fff 5px
+            );
+            height: 40px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <!-- Модальное окно подписки -->
+    <div id="subscription-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden no-print">
+        <!-- ... существующий HTML ... -->
+        <div class="bg-white p-8 rounded-lg shadow-2xl text-center max-w-sm mx-auto">
+            <h2 class="text-xl font-bold mb-4">Почти готово!</h2>
+            <p class="text-gray-600 mb-6">Сначала подпишись на канал Алексея Орфеева, чтобы скачать документы.</p>
+            <div class="space-y-3">
+                <a href="https://t.me/+iJy4PBWIPuA4ZGNi" target="_blank" class="block w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2.5 px-4 rounded-lg transition-colors duration-200">
+                    Подписаться
+                </a>
+                <button id="confirm-subscription-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 px-4 rounded-lg transition-colors duration-200">
+                    Я подписался
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Основной макет приложения -->
+    <div class="flex flex-col lg:flex-row w-full min-h-screen">
+        <!-- Левая панель (форма) -->
+        <div class="w-full lg:w-1/3 bg-white p-6 lg:p-8 shadow-lg no-print">
+            <!-- ... существующий HTML ... -->
+            <div class="flex items-center mb-6">
+                <img src="https://i.postimg.cc/59YpVYJM/Logo-Orfeev.png" alt="Логотип Орфеева" class="h-12 w-12 mr-4 rounded-full object-cover">
+                <h1 class="text-xl font-bold">Генератор документов от Алексея Орфеева</h1>
+            </div>
+
+            <!-- Поля для данных (только чтение) -->
+            <div class="space-y-4">
+                <div>
+                    <label for="college-name" class="block text-sm font-medium text-gray-600">Название университета</label>
+                    <input type="text" id="college-name" readonly class="mt-1 block w-full bg-gray-200 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none sm:text-sm text-gray-500">
+                </div>
+                <div>
+                    <label for="student-name" class="block text-sm font-medium text-gray-600">Имя студента</label>
+                    <input type="text" id="student-name" readonly class="mt-1 block w-full bg-gray-200 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none sm:text-sm text-gray-500">
+                </div>
+                <div>
+                    <label for="enrollment-no" class="block text-sm font-medium text-gray-600">Номер зачисления</label>
+                    <input type="text" id="enrollment-no" readonly class="mt-1 block w-full bg-gray-200 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none sm:text-sm text-gray-500">
+                </div>
+                <div>
+                    <label for="program-name" class="block text-sm font-medium text-gray-600">Программа</label>
+                    <input type="text" id="program-name" readonly class="mt-1 block w-full bg-gray-200 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none sm:text-sm text-gray-500">
+                </div>
+            </div>
+
+            <!-- Кнопки управления -->
+            <div class="mt-8 space-y-3">
+                <button id="generate-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-4 rounded-lg flex items-center justify-center space-x-2 transition-colors duration-200">
+                    <svg id="spinner" class="animate-spin -ml-1 mr-3 h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span id="btn-text">Сгенерировать документы</span>
+                </button>
+                <button id="save-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 px-4 rounded-lg flex items-center justify-center space-x-2 transition-colors duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    <span>Сохранить все документы (.zip)</span>
+                </button>
+                <div id="status-text" class="text-center text-gray-500 text-sm h-5"></div>
+            </div>
+
+        </div>
+
+        <!-- Правая панель (превью документов) -->
+        <div class="w-full lg:w-2/3 bg-gray-100 p-6 lg:p-8 overflow-y-auto">
+            <h2 class="text-xl font-bold mb-6">Предпросмотр документов</h2>
+            <div id="previews-wrapper" class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+
+                <!-- --- ИЗМЕНЕННЫЙ ШАБЛОН: ID-карта --- -->
+                <div id="preview-id-card-wrapper" class="preview-container">
+                    <h3 class="font-semibold mb-2">IDENTIFICATION CARD</h3>
+                    <div id="id-card-content" class="bg-white p-0 rounded-lg shadow-md max-w-sm mx-auto h-[210px] w-[340px] flex flex-col overflow-hidden border border-gray-200">
+                        <!-- Header Bar -->
+                        <div id="id-card-header" class="h-10 bg-blue-800 flex items-center justify-between px-4">
+                            <!-- ИЗМЕНЕНИЕ: Добавлен flex-shrink-0 для логотипа -->
+                            <img id="id-card-logo" src="https://placehold.co/32x32/E2E8F0/4A5568?text=LOGO" class="rounded-full w-8 h-8 object-contain flex-shrink-0" alt="University Logo">
+                            <!-- ИЗМЕНЕНИЕ: Добавлен pl-3 (padding) для отступа -->
+                            <h4 id="id-card-university" class="font-bold text-sm text-white text-right flex-1 min-w-0 pl-3"></h4>
+                        </div>
+                        <!-- Content -->
+                        <div class="flex-1 flex p-3 space-x-3 relative">
+                            <!-- Watermark -->
+                            <div class="absolute inset-0 watermark" style="--watermark-url: url('https://placehold.co/100x100/E2E8F0/4A5568?text=SEAL');"></div>
+
+                            <img id="id-card-photo" src="https://placehold.co/80x100/E2E8F0/4A5568?text=Photo" class="w-20 h-24 rounded-md border-2 border-white shadow-sm object-cover z-10" alt="Student Photo">
+
+                            <div class="flex-1 text-[10px] text-gray-800 z-10">
+                                <p class="text-gray-500">Student Name</p>
+                                <p id="id-card-name" class="font-semibold text-xs mb-1"></p>
+
+                                <p class="text-gray-500">Student ID</p>
+                                <p id="id-card-enroll" class="font-medium mb-1"></p>
+
+                                <p class="text-gray-500">Program</p>
+                                <p id="id-card-program" class="font-medium mb-1"></p>
+
+                                <div class="flex justify-between w-full mt-1">
+                                    <div>
+                                        <p class="text-gray-500">Issued</p>
+                                        <p id="id-card-issued" class="font-medium"></p>
+                                    </div>
+                                    <div>
+                                        <p class="text-gray-500">Expires</p>
+                                        <p id="id-card-valid-thru" class="font-medium"></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Footer / Barcode -->
+                        <div class="h-7 bg-white px-3 flex items-center justify-between">
+                             <div class="barcode"></div>
+                             <p class="text-[8px] text-gray-400 italic">If found, please return to university office.</p>
+                        </div>
+                        <!-- Magnetic Stripe -->
+                        <div class="h-3 bg-black"></div>
+                    </div>
+                </div>
+
+                <!-- Превью: Файл данных -->
+                <div id="preview-data-file-wrapper" class="preview-container">
+                    <h3 class="font-semibold mb-2">Файл данных (info.txt)</h3>
+                     <div class="bg-gray-800 text-white p-4 rounded-lg shadow-md font-mono text-xs h-[210px] overflow-auto">
+                        <pre id="data-file-content"></pre>
+                    </div>
+                </div>
+
+                <!-- --- ИЗМЕНЕННЫЙ ШАБЛОН: Квитанция об оплате --- -->
+                <div id="preview-fee-receipt-wrapper" class="preview-container">
+                    <h3 class="font-semibold mb-2">FEE RECEIPT</h3>
+                    <div id="fee-receipt-content" class="bg-white p-8 rounded-lg shadow-md max-w-md mx-auto relative border border-gray-200">
+                        <div class="absolute inset-0 watermark" style="--watermark-url: url('https://placehold.co/200x200/E2E8F0/4A5568?text=SEAL');"></div>
+
+                        <div class="relative z-10">
+                            <div class="flex justify-between items-start mb-8">
+                                <div>
+                                    <img id="receipt-logo" src="https://placehold.co/64x64/E2E8F0/4A5568?text=LOGO" class="h-16 object-contain mb-2" alt="University Seal">
+                                    <h4 id="receipt-university" class="font-bold text-xl"></h4>
+                                    <p id="receipt-address" class="text-xs text-gray-500 max-w-[200px]"></p>
+                                </div>
+                                <div class="text-right">
+                                    <h3 class="text-2xl font-bold text-gray-700">RECEIPT</h3>
+                                    <p class="text-sm"><strong>Receipt #:</strong> <span id="receipt-no"></span></p>
+                                    <p class="text-sm"><strong>Date:</strong> <span id="receipt-date"></span></p>
+                                </div>
+                            </div>
+
+                            <div class="bg-gray-50 rounded-lg p-4 mb-6 text-sm">
+                                <h5 class="font-semibold mb-2">BILL TO:</h5>
+                                <p id="receipt-name" class="font-bold"></p>
+                                <p><strong>Enrollment No.:</strong> <span id="receipt-enroll"></span></p>
+                                <p><strong>Program:</strong> <span id="receipt-program"></span></p>
+                            </div>
+
+                            <table class="w-full text-sm mb-6">
+                                <thead>
+                                    <tr class="border-b-2 border-gray-300">
+                                        <th class="text-left py-2 font-semibold">Description</th>
+                                        <th class="text-right py-2 font-semibold">Amount ($)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="border-b border-gray-200">
+                                        <td class="py-3">Tuition and Fees - <span id="receipt-semester"></span></td>
+                                        <td id="receipt-amount" class="text-right py-3">$0.00</td>
+                                    </tr>
+                                    <!-- Можно добавить больше строк, если нужно -->
+                                </tbody>
+                                <tfoot>
+                                    <tr>
+                                         <td class="py-3 font-bold text-right">Total Paid</td>
+                                        <td id="receipt-total" class="text-right py-3 font-bold text-lg">$0.00</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+
+                            <div class="text-sm text-gray-600">
+                                <!-- ИЗМЕНЕНИЕ 3: Добавлен span#receipt-card-last4 -->
+                                <p class="mb-2"><strong>Payment Method:</strong> Credit Card (XXXX-XXXX-XXXX-<span id="receipt-card-last4">1234</span>)</p>
+                                <p class="text-xs italic">Thank you for your payment. This document confirms receipt of funds for the stated purpose. Please retain for your records.</p>
+                            </div>
+
+                            <div class="mt-12 text-right text-sm relative">
+                                <img id="receipt-signature" src="https://placehold.co/300x100/E2E8F0/4A5568?text=Signature" class="absolute bottom-10 right-0 w-36 h-12 object-contain loading-img z-10" alt="Authorized Signature">
+                                <p class="relative z-0">____________________</p>
+                                <p class="mt-1 relative z-0">Authorized Signature, Registrar</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- --- ИЗМЕНЕННЫЙ ШАБЛОН: Расписание занятий --- -->
+                <div id="preview-schedule-wrapper" class="preview-container">
+                       <h3 class="font-semibold mb-2">CLASS SCHEDULE</h3>
+                    <div id="class-schedule-content" class="bg-white p-8 rounded-lg shadow-md max-w-md mx-auto relative border border-gray-200">
+                        <div class="absolute inset-0 watermark" style="--watermark-url: url('https://placehold.co/200x200/E2E8F0/4A5568?text=SEAL');"></div>
+
+                        <div class="relative z-10">
+                            <div class="flex justify-between items-center mb-6 border-b pb-4">
+                                <img id="schedule-logo" src="https://placehold.co/48x48/E2E8F0/4A5568?text=LOGO" class="h-14 object-contain" alt="University Seal">
+                                <div class="text-right">
+                                    <h4 id="schedule-university" class="font-bold text-lg"></h4>
+                                    <p class="font-semibold text-gray-600">Office of the Registrar</p>
+                                </div>
+                            </div>
+
+                            <h2 class="text-xl font-bold text-center mb-6">CLASS SCHEDULE - <span id="schedule-semester-title"></span></h2>
+
+                            <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-xs mb-6 bg-gray-50 p-3 rounded">
+                                <p><strong>Student Name:</strong> <span id="schedule-name"></span></p>
+                                <p><strong>Student ID:</strong> <span id="schedule-enroll"></span></p>
+                                <p><strong>Program:</strong> <span id="schedule-program"></span></p>
+                                <p><strong>Date Issued:</strong> <span id="schedule-date"></span></p>
+                            </div>
+
+                            <table class="w-full text-xs border-t">
+                                <thead>
+                                    <tr class="border-b bg-gray-100">
+                                         <th class="text-left py-2 px-2 font-semibold">CODE</th>
+                                        <th class="text-left py-2 px-2 font-semibold">COURSE NAME</th>
+                                        <th class="text-left py-2 px-2 font-semibold">PROFESSOR</th>
+                                        <th class="text-center py-2 px-2 font-semibold">CR</th>
+                                        <th class="text-left py-2 px-2 font-semibold">LOCATION</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="schedule-courses-tbody">
+                                    <!-- Ряды курсов будут добавлены здесь через JS -->
+                                </tbody>
+                            </table>
+
+                            <div class="mt-4 text-right text-xs font-semibold">
+                                Total Credits: <span id="schedule-total-credits">0.0</span>
+                            </div>
+
+                            <div class="mt-16 text-xs text-gray-500 italic">
+                                <p>This document is an official record of registration. Any changes must be processed through the Office of the Registrar. Non-attendance does not constitute withdrawal.</p>
+                            </div>
+
+                            <div class="mt-12 text-right text-sm relative">
+                                <img id="schedule-signature" src="https://placehold.co/300x100/E2E8F0/4A5568?text=Signature" class="absolute bottom-10 right-0 w-36 h-12 object-contain loading-img z-10" alt="Authorized Signature">
+                                <p class="relative z-0">____________________</p>
+                                <p id="schedule-registrar" class="mt-1 relative z-0">University Registrar</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Всплывающее сообщение об ошибке -->
+    <div id="message-box" class="fixed bottom-5 right-5 bg-red-800 border-red-600 text-white py-3 px-5 rounded-lg shadow-lg opacity-0 transform translate-y-2 max-w-sm hidden">
+        <!-- ... существующий HTML ... -->
+        <div class="flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3 text-red-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <p id="message-text"></p>
+        </div>
+    </div>
+
+    <script>
+        // ИСПРАВЛЕНИЕ: Определение currentYear в глобальной (для скрипта) области видимости
+        const currentYear = new Date().getFullYear();
+
+        // --- ОБНОВЛЕННЫЕ СПИСКИ ДАННЫХ ---
+
+        // Объекты университетов с доп. информацией (ИЗМЕНЕНИЕ 4: Добавлены реальные адреса)
+        const universityData = {
+            "Conestoga College": { address: "299 Doon Valley Dr, Kitchener, ON N2G 4M4", color: "bg-red-700" },
+            "George Brown College": { address: "200 King St E, Toronto, ON M5A 3W8", color: "bg-blue-800" },
+            "Université de Montréal": { address: "2900 Edouard-Montpetit Blvd, Montreal, QC H3T 1J4", color: "bg-blue-900" },
+            "Humber College": { address: "205 Humber College Blvd, Etobicoke, ON M9W 5L7", color: "bg-yellow-500" },
+            "Douglas College": { address: "700 Royal Ave, New Westminster, BC V3M 5Z5", color: "bg-green-700" },
+            "Fanshawe College": { address: "1001 Fanshawe College Blvd, London, ON N5Y 5R6", color: "bg-red-800" },
+            "Dalhousie University": { address: "6299 South St, Halifax, NS B3H 4R2", color: "bg-gray-800" }, // Изменен цвет для контраста
+            "Cégep de Sherbrooke": { address: "475 Rue du Cégep, Sherbrooke, QC J1E 4K1", color: "bg-indigo-700" },
+            "University of Toronto": { address: "27 King's College Cir, Toronto, ON M5S 1A1", color: "bg-blue-900" },
+            "McGill University": { address: "845 Sherbrooke St W, Montreal, QC H3A 0G4", color: "bg-red-800" },
+            "University of British Columbia": { address: "2329 West Mall, Vancouver, BC V6T 1Z4", color: "bg-blue-700" },
+            "Seneca College": { address: "1750 Finch Ave E, North York, ON M2J 2X5", color: "bg-red-600" }
+        };
+        const universityNames = Object.keys(universityData);
+
+        const firstNames = [
+            "Liam", "Noah", "Oliver", "William", "James", "Benjamin", "Lucas", "Léo",
+            "Henry", "Theodore", "Thomas", "Nathan", "Félix", "Jacob", "Jackson", "Mateo",
+            "Michael", "Owen", "Sebastian", "Julian", "Ethan", "Aiden", "Wyatt", "Carter"
+        ];
+        const femaleFirstNames = [
+            "Olivia", "Emma", "Charlotte", "Amelia", "Ava", "Sophia", "Alice", "Mia",
+            "Evelyn", "Harper", "Florence", "Léa", "Aria", "Chloé", "Juliette", "Abigail",
+            "Zoe", "Elizabeth", "Scarlett", "Layla", "Penelope", "Victoria", "Lily", "Rose"
+        ];
+        const lastNames = [
+            "Smith", "Johnson", "Williams", "Brown", "Jones", "Tremblay", "Miller", "Davis",
+            "Gagnon", "Roy", "Bouchard", "Martin", "Wilson", "Anderson", "Thomas",
+            "Taylor", "Moore", "Jackson", "Leblanc", "Lee", "Perez", "Thompson", "White"
+        ];
+        // Более конкретные программы
+        const programs = [
+            "Computer Programming & Analysis", "Business Administration - Finance", "Biomedical Engineering Technology",
+            "Architectural Technology", "Practical Nursing", "Graphic Design", "Civil Engineering Technician",
+            "Early Childhood Education", "Mechanical Engineering Technology"
+        ];
+        // Обновленные курсы с доп. информацией
+        const courses = [
+            { code: 'CS-101A', name: 'Introduction to Programming', prof: 'Dr. A. Turing', credits: 4.0, location: 'Lab 1 (A-Wing)' },
+            { code: 'ENG-202', name: 'Advanced Academic Writing', prof: 'Prof. J. Austen', credits: 3.0, location: 'Room 205 (B-Wing)' },
+            { code: 'CHEM-105', name: 'General Chemistry I', prof: 'Dr. M. Curie', credits: 4.5, location: 'Lecture Hall A' },
+            { code: 'BIO-110', name: 'Biology Fundamentals', prof: 'Dr. C. Darwin', credits: 4.5, location: 'Lab 3 (C-Wing)' },
+            { code: 'PSY-201', name: 'Intro to Psychology', prof: 'Dr. S. Freud', credits: 3.0, location: 'Room 302 (B-Wing)' },
+            { code: 'ART-101', name: 'Art History Survey', prof: 'Prof. L. Vinci', credits: 3.0, location: 'Studio 5 (D-Wing)' },
+            { code: 'MATH-150', name: 'Calculus I for Engineers', prof: 'Dr. I. Newton', credits: 4.0, location: 'Room 101 (A-Wing)' },
+            { code: 'PHYS-201', name: 'Physics for Engineers', prof: 'Dr. A. Einstein', credits: 4.5, location: 'Room 203 (A-Wing)' },
+            { code: 'BUS-100', name: 'Intro to Business Mgmt', prof: 'Prof. P. Drucker', credits: 3.0, location: 'Lecture Hall B' },
+            { code: 'MKT-210', name: 'Marketing Principles', prof: 'Prof. D. Ogilvy', credits: 3.0, location: 'Room 115 (E-Wing)' }
+        ];
+        const deptCodes = ["CS", "ENG", "MATH", "PHYS", "BIO", "CHEM", "PSY", "ART", "BUS", "MKT"];
+        const registrarNames = ["Dr. Evelyn Reed", "Mr. David Chen", "Ms. Sarah Jenkins", "Dr. Robert Grant"];
+
+        // --- Получение элементов DOM ---
+        const generateBtn = document.getElementById('generate-btn');
+        // ... (остальные существующие переменные) ...
+        const saveBtn = document.getElementById('save-btn');
+        const btnText = document.getElementById('btn-text');
+        const spinner = document.getElementById('spinner');
+        const statusText = document.getElementById('status-text');
+        const subscriptionModal = document.getElementById('subscription-modal');
+        const confirmSubscriptionBtn = document.getElementById('confirm-subscription-btn');
+
+        const collegeInput = document.getElementById('college-name');
+        const nameInput = document.getElementById('student-name');
+        const enrollInput = document.getElementById('enrollment-no');
+        const programInput = document.getElementById('program-name');
+
+        const previewWrappers = document.querySelectorAll('.preview-container');
+
+        // Элементы ID-карты (обновлено)
+        const idCardHeader = document.getElementById('id-card-header');
+        const idCardUniversity = document.getElementById('id-card-university');
+        const idCardName = document.getElementById('id-card-name');
+        const idCardEnroll = document.getElementById('id-card-enroll');
+        const idCardProgram = document.getElementById('id-card-program');
+        const idCardPhoto = document.getElementById('id-card-photo');
+        const idCardLogo = document.getElementById('id-card-logo');
+        const idCardIssued = document.getElementById('id-card-issued');
+        const idCardValidThru = document.getElementById('id-card-valid-thru');
+        const idCardWatermark = document.querySelector('#id-card-content .watermark');
+
+
+        // Элементы файла данных
+        const dataFileContent = document.getElementById('data-file-content');
+        let currentTxtContent = '';
+
+        // Элементы квитанции (обновлено)
+        const receiptUniversity = document.getElementById('receipt-university');
+        const receiptAddress = document.getElementById('receipt-address');
+        const receiptNo = document.getElementById('receipt-no');
+        const receiptDate = document.getElementById('receipt-date');
+        const receiptEnroll = document.getElementById('receipt-enroll');
+        const receiptName = document.getElementById('receipt-name');
+        const receiptProgram = document.getElementById('receipt-program');
+        const receiptSemester = document.getElementById('receipt-semester');
+        const receiptAmount = document.getElementById('receipt-amount');
+        const receiptTotal = document.getElementById('receipt-total');
+        const receiptLogo = document.getElementById('receipt-logo');
+        const receiptSignature = document.getElementById('receipt-signature');
+        const receiptWatermark = document.querySelector('#fee-receipt-content .watermark');
+        const receiptCardLast4 = document.getElementById('receipt-card-last4'); // ИЗМЕНЕНИЕ 3: Добавлен ID
+
+        // Элементы расписания (обновлено)
+        const scheduleUniversity = document.getElementById('schedule-university');
+        const scheduleSemesterTitle = document.getElementById('schedule-semester-title');
+        const scheduleName = document.getElementById('schedule-name');
+        const scheduleEnroll = document.getElementById('schedule-enroll');
+        const scheduleProgram = document.getElementById('schedule-program');
+        const scheduleDate = document.getElementById('schedule-date');
+        const scheduleCoursesBody = document.getElementById('schedule-courses-tbody');
+        const scheduleTotalCredits = document.getElementById('schedule-total-credits');
+        const scheduleLogo = document.getElementById('schedule-logo');
+        const scheduleSignature = document.getElementById('schedule-signature');
+        const scheduleRegistrar = document.getElementById('schedule-registrar');
+        const scheduleWatermark = document.querySelector('#class-schedule-content .watermark');
+
+        // --- Вспомогательные функции ---
+        // showMessage, getBase64Image, generateAndAddPdf (остаются без изменений)
+        const showMessage = (message) => {
+            // ... (существующий код) ...
+            const messageBox = document.getElementById('message-box');
+            const messageText = document.getElementById('message-text');
+            messageText.textContent = message;
+            messageBox.classList.remove('hidden', 'opacity-0', 'translate-y-2');
+            messageBox.classList.add('opacity-100', 'translate-y-0');
+            setTimeout(() => {
+                messageBox.classList.remove('opacity-100', 'translate-y-0');
+                messageBox.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => messageBox.classList.add('hidden'), 300);
+            }, 3000);
+        };
+
+        const getBase64Image = async (url) => {
+            // ... (существующий код) ...
+            try {
+                const response = await fetch(url);
+                const blob = await response.blob();
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(blob);
+                });
+            } catch (error) {
+                console.error('Failed to fetch image:', error);
+                return 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="#E2E8F0" /><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="12" fill="#4A5568">Image</text></svg>';
+            }
+        };
+
+        // --- ИЗМЕНЕНИЕ: Добавлена функция-помощник для паузы ---
+        /**
+         * Ждет указанное количество миллисекунд.
+         * Используется, чтобы дать браузеру время на "перерисовку" (reflow)
+         * перед запуском html2canvas.
+         * @param {number} ms - Время ожидания в миллисекундах
+         */
+        const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        const generateAndAddPdf = async (elementId, fileName, zip) => {
+            const element = document.getElementById(elementId);
+
+            // --- НОВЫЙ ПОДХОД: КЛОНИРОВАНИЕ ЭЛЕМЕНТА ---
+
+            // 1. Создаем клон элемента
+            const clone = element.cloneNode(true);
+            clone.id = `${elementId}-clone`; // Даем уникальный ID
+
+            // 2. Настраиваем стили клона, чтобы он был "невидимым"
+            //    но полностью отрисованным.
+            clone.style.position = 'absolute';
+            clone.style.left = '-9999px'; // Убираем за экран
+            clone.style.top = '0';
+            clone.style.zIndex = '1';
+
+            // 3. Применяем "полные" стили к клону (не к оригиналу)
+            clone.style.height = 'auto';
+            clone.style.overflow = 'visible';
+
+            // Убираем flex-1 у дочернего элемента клона
+            const flexChildClone = clone.querySelector('.flex-1');
+            if (flexChildClone) {
+                flexChildClone.classList.remove('flex-1');
+            }
+
+            // 4. Добавляем клон в DOM, чтобы браузер его отрисовал
+            document.body.appendChild(clone);
+
+            // 5. ЖДЕМ 100мс, чтобы браузер 100% отрисовал клон
+            await wait(100);
+
+            // 6. Делаем снимок КЛОНА (не оригинала)
+            const canvas = await html2canvas(clone, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: null
+            });
+
+            // 7. Удаляем клон из DOM, он нам больше не нужен
+            document.body.removeChild(clone);
+
+            // --- КОНЕЦ НОВОГО ПОДХОДА ---
+
+            const imgData = canvas.toDataURL('image/jpeg', 1.0);
+            const { jsPDF } = window.jspdf;
+
+            // --- ИСПРАВЛЕНИЕ ---
+            // 1. Получаем РЕАЛЬНЫЕ размеры холста (в пикселях), который включает тени
+            const imgWidth = canvas.width;
+            const imgHeight = canvas.height;
+
+            // 2. Определяем ориентацию
+            const orientation = imgWidth > imgHeight ? 'l' : 'p'; // 'l' for landscape, 'p' for portrait
+
+            // 3. Конвертируем пиксели в 'mm' (миллиметры) для jsPDF
+            // 1 px = 0.264583333 mm
+            const pdfWidth = imgWidth * 0.264583;
+            const pdfHeight = imgHeight * 0.264583;
+
+            // 4. Создаем PDF с точными размерами холста (а не элемента)
+            const pdf = new jsPDF(orientation, 'mm', [pdfWidth, pdfHeight]);
+
+            // 5. Добавляем изображение, чтобы оно занимало 100% этой новой страницы
+            pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+            // --- КОНЕЦ ИСПРАВЛЕНИЯ ---
+
+            zip.file(fileName, pdf.output('blob'));
+        };
+
+
+        // --- ОБНОВЛЕННАЯ Основная логика ---
+
+        generateBtn.addEventListener('click', async () => {
+            generateBtn.disabled = true;
+            saveBtn.disabled = true;
+            btnText.textContent = 'Генерация...';
+            spinner.classList.remove('hidden');
+            statusText.textContent = 'Загрузка данных...';
+
+            previewWrappers.forEach(el => el.classList.remove('visible'));
+
+            // --- Генерация случайных данных (расширено) ---
+            const isMale = Math.random() < 0.5;
+            const studentFirstName = isMale ? firstNames[Math.floor(Math.random() * firstNames.length)] : femaleFirstNames[Math.floor(Math.random() * femaleFirstNames.length)];
+            const studentLastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+            const studentFullName = `${studentFirstName} ${studentLastName}`;
+
+            const universityName = universityNames[Math.floor(Math.random() * universityNames.length)];
+            const universityInfo = universityData[universityName];
+            const program = programs[Math.floor(Math.random() * programs.length)];
+            // Более реалистичный ID
+            const enrollmentNo = `${Math.floor(100 + Math.random() * 900)}-${Math.floor(100 + Math.random() * 900)}-${Math.floor(100 + Math.random() * 900)}`;
+
+            // ИСПРАВЛЕНИЕ: currentYear уже определен выше
+            const maxBirthYear = currentYear - 18;
+            const minBirthYear = currentYear - 23;
+            const birthYear = Math.floor(Math.random() * (maxBirthYear - minBirthYear + 1)) + minBirthYear;
+            const birthMonth = Math.floor(1 + Math.random() * 12);
+            const birthDay = Math.floor(1 + Math.random() * 28);
+            const dob_doc_format = `${String(birthMonth).padStart(2, '0')}/${String(birthDay).padStart(2, '0')}/${birthYear}`;
+            const dob_txt_format = `${String(birthDay).padStart(2, '0')}.${String(birthMonth).padStart(2, '0')}.${birthYear}`;
+
+            const issueDate = new Date();
+            const expiryDate = new Date();
+            expiryDate.setFullYear(issueDate.getFullYear() + 4);
+            const issue_date_format = `${String(issueDate.getMonth() + 1).padStart(2, '0')}/${issueDate.getFullYear()}`;
+            const validThru = `${String(expiryDate.getMonth() + 1).padStart(2, '0')}/${expiryDate.getFullYear()}`;
+
+            const today = issueDate.toLocaleDateString('en-US');
+            const semester = "FALL " + currentYear;
+            const receiptNoGen = `${currentYear}${Math.floor(10000 + Math.random() * 90000)}`;
+            const registrar = registrarNames[Math.floor(Math.random() * registrarNames.length)];
+            const randomLast4 = Math.floor(1000 + Math.random() * 9000); // ИЗМЕНЕНИЕ 3: Случайные 4 цифры
+
+            const emailName = `${studentFirstName.charAt(0)}${studentLastName}`.replace(/\s+/g, '').toLowerCase();
+            const email = `${emailName}${Math.floor(100 + Math.random() * 900)}@${universityName.split(' ')[0].toLowerCase()}.ca`;
+
+            // Выбор 4-5 случайных курсов
+            const selectedCourses = [];
+            let totalCredits = 0;
+            const numCourses = Math.floor(Math.random() * 2) + 4; // 4 или 5 курсов
+            const coursesCopy = [...courses];
+            for (let i = 0; i < numCourses; i++) {
+                if (coursesCopy.length === 0) break;
+                const randomIndex = Math.floor(Math.random() * coursesCopy.length);
+                const course = coursesCopy.splice(randomIndex, 1)[0];
+                selectedCourses.push(course);
+                totalCredits += course.credits;
+            }
+
+            const randomAmount = totalCredits * 550.75 + (Math.floor(Math.random() * 201) + 100); // Базовая стоимость + сборы
+
+            statusText.textContent = 'Генерация ИИ изображений...';
+            // Генерация 4 изображений: фото, подпись, лого, водяной знак
+            const [photoBase64, signatureBase64, universityLogoBase64, universitySealBase64] = await Promise.all([
+                // 1. Фото
+                (async () => {
+                    try {
+                        const prompt = `a highly realistic passport photo of a young Canadian ${isMale ? 'man' : 'woman'} with a friendly expression. The background is a solid light gray. Full face visible, well-lit. College student style.`;
+                        const payload = { instances: { prompt }, parameters: { sampleCount: 1 } };
+                        const apiKey = "";
+                        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`;
+                        const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                        const result = await response.json();
+                        if (result.predictions?.[0]?.bytesBase64Encoded) {
+                            return `data:image/jpeg;base64,${result.predictions[0].bytesBase64Encoded}`;
+                        }
+                        return await getBase64Image("https://placehold.co/80x100/E2E8F0/4A5568?text=Photo");
+                    } catch (error) {
+                        console.error('Failed to fetch image for photo:', error);
+                        return await getBase64Image("https://placehold.co/80x100/E2E8F0/4A5568?text=Photo");
+                    }
+                })(),
+                // 2. Подпись
+                (async () => {
+                    try {
+                        const prompt = `A highly realistic, professional handwritten signature in black ink on a white background. It should look like an authorized person's signature for '${registrar}'.`;
+                        const payload = { instances: { prompt }, parameters: { sampleCount: 1 } };
+                        const apiKey = "";
+                        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`;
+                        const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                        const result = await response.json();
+                        if (result.predictions?.[0]?.bytesBase64Encoded) {
+                            return `data:image/jpeg;base64,${result.predictions[0].bytesBase64Encoded}`;
+                        }
+                        return await getBase64Image("https://placehold.co/300x100/E2E8F0/4A5568?text=Signature");
+                    } catch (error) {
+                        console.error('Failed to fetch image for signature:', error);
+                        return await getBase64Image("https://placehold.co/300x100/E2E8F0/4A5568?text=Signature");
+                    }
+                })(),
+                // 3. Логотип
+                (async () => {
+                    try {
+                        const prompt = `a modern, clean university logo for '${universityName}'. It should be a simple, professional icon, minimal text, suitable for a letterhead.`;
+                        const payload = { instances: { prompt }, parameters: { sampleCount: 1 } };
+                        const apiKey = "";
+                        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`;
+                        const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                        const result = await response.json();
+                        if (result.predictions?.[0]?.bytesBase64Encoded) {
+                            return `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
+                        }
+                        return await getBase64Image("https://placehold.co/64x64/E2E8F0/4A5568?text=LOGO");
+                    } catch (error) {
+                        console.error('Failed to fetch image for logo:', error);
+                        return await getBase64Image("https://placehold.co/64x64/E2E8F0/4A5568?text=LOGO");
+                    }
+                })(),
+                // 4. Водяной знак (Печать)
+                (async () => {
+                    try {
+                        const prompt = `a traditional, circular university seal or crest for '${universityName}'. It should be monochrome, like a stamp or watermark.`;
+                        const payload = { instances: { prompt }, parameters: { sampleCount: 1 } };
+                        const apiKey = "";
+                        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`;
+                        const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                        const result = await response.json();
+                        if (result.predictions?.[0]?.bytesBase64Encoded) {
+                            return `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
+                        }
+                        return await getBase64Image("https://placehold.co/200x200/E2E8F0/4A5568?text=SEAL");
+                    } catch (error) {
+                        console.error('Failed to fetch image for seal:', error);
+                        return await getBase64Image("https://placehold.co/200x200/E2E8F0/4A5568?text=SEAL");
+                    }
+                })()
+            ]);
+            statusText.textContent = 'Обновление документов...';
+
+            // --- Обновление DOM (расширено) ---
+            const sealUrl = `url('${universitySealBase64}')`;
+
+            // Обновление полей в левой панели
+            collegeInput.value = universityName;
+            nameInput.value = studentFullName;
+            enrollInput.value = enrollmentNo;
+            programInput.value = program;
+
+            // Обновление ID-карты
+            idCardHeader.className = `h-10 ${universityInfo.color} flex items-center justify-between px-4`;
+            idCardUniversity.textContent = universityName.toUpperCase();
+            idCardName.textContent = studentFullName.toUpperCase();
+            idCardEnroll.textContent = enrollmentNo;
+            idCardProgram.textContent = program.toUpperCase();
+            idCardIssued.textContent = issue_date_format;
+            idCardValidThru.textContent = validThru;
+            idCardPhoto.src = photoBase64;
+            idCardLogo.src = universityLogoBase64;
+            idCardWatermark.style.setProperty('--watermark-url', sealUrl);
+
+            // Обновление info.txt (ИЗМЕНЕНИЕ 1: Возвращен старый формат)
+            currentTxtContent =
+`${universityName}
+${studentFullName}
+${dob_txt_format}
+${email}
+`;
+            dataFileContent.textContent = currentTxtContent;
+
+            // Обновление квитанции
+            receiptUniversity.textContent = universityName;
+            receiptAddress.textContent = universityInfo.address;
+            receiptNo.textContent = receiptNoGen;
+            receiptDate.textContent = today;
+            receiptEnroll.textContent = enrollmentNo;
+            receiptName.textContent = studentFullName;
+            receiptProgram.textContent = program;
+            receiptSemester.textContent = semester;
+            receiptAmount.textContent = `$${randomAmount.toFixed(2)}`;
+            receiptTotal.textContent = `$${randomAmount.toFixed(2)}`;
+            receiptLogo.src = universityLogoBase64;
+            receiptSignature.src = signatureBase64;
+            receiptSignature.classList.remove('loading-img');
+            receiptWatermark.style.setProperty('--watermark-url', sealUrl);
+            receiptCardLast4.textContent = randomLast4; // ИЗМЕНЕНИЕ 3: Установка случайных цифр
+
+            // Обновление расписания
+            scheduleUniversity.textContent = universityName;
+            scheduleSemesterTitle.textContent = semester;
+            scheduleName.textContent = studentFullName;
+            scheduleEnroll.textContent = enrollmentNo;
+            scheduleProgram.textContent = program;
+            scheduleDate.textContent = today;
+            scheduleLogo.src = universityLogoBase64;
+            scheduleSignature.src = signatureBase64;
+            scheduleSignature.classList.remove('loading-img');
+            scheduleRegistrar.textContent = `${registrar}, University Registrar`;
+            scheduleWatermark.style.setProperty('--watermark-url', sealUrl);
+
+            // Заполнение таблицы курсов
+            scheduleCoursesBody.innerHTML = ''; // Очищаем старые данные
+            selectedCourses.forEach(course => {
+                const row = document.createElement('tr');
+                row.className = 'border-b border-gray-200';
+                row.innerHTML = `
+                    <td class="py-2 px-2 font-medium">${course.code}</td>
+                    <td class="py-2 px-2">${course.name}</td>
+                    <td class="py-2 px-2">${course.prof}</td>
+                    <td class="py-2 px-2 text-center">${course.credits.toFixed(1)}</td>
+                    <td class="py-2 px-2">${course.location}</td>
+                `;
+                scheduleCoursesBody.appendChild(row);
+            });
+            scheduleTotalCredits.textContent = totalCredits.toFixed(1);
+
+            // --- Завершение ---
+            generateBtn.disabled = false;
+            saveBtn.disabled = false;
+            btnText.textContent = 'Сгенерировать документы';
+            spinner.classList.add('hidden');
+            statusText.textContent = 'Документы готовы!';
+
+            setTimeout(() => {
+                previewWrappers.forEach(el => el.classList.add('visible'));
+            }, 100);
+        });
+
+        // --- Обработчики кнопок (без изменений) ---
+
+        const startDownload = async () => {
+            // ... (существующий код) ...
+            saveBtn.disabled = true;
+            statusText.textContent = 'Подготовка файлов...';
+            const zip = new JSZip();
+
+            statusText.textContent = 'Сохранение PDF...';
+            await generateAndAddPdf('id-card-content', 'identification_card.pdf', zip);
+            await generateAndAddPdf('fee-receipt-content', 'fee_receipt.pdf', zip);
+            await generateAndAddPdf('class-schedule-content', 'class_schedule.pdf', zip);
+
+            zip.file('info.txt', currentTxtContent);
+
+            statusText.textContent = 'Создание ZIP архива...';
+            zip.generateAsync({ type: 'blob' })
+                .then(function(content) {
+                    const url = URL.createObjectURL(content);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'university_documents.zip';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    statusText.textContent = 'ZIP архив успешно скачан!';
+                    saveBtn.disabled = false;
+                })
+                .catch(error => {
+                    console.error('Error generating zip file:', error);
+                    showMessage("Произошла ошибка при скачивании файла. Попробуйте еще раз.");
+                    statusText.textContent = 'Ошибка сохранения.';
+                    saveBtn.disabled = false;
+                });
+        };
+
+        saveBtn.addEventListener('click', function() {
+            var m = document.getElementById('subscription-modal');
+            m.classList.remove('hidden');
+        });
+
+        document.getElementById('confirm-subscription-btn').addEventListener('click', function() {
+            document.getElementById('subscription-modal').classList.add('hidden');
+            startDownload();
+        });
+
+    </script>
+</body>
+</html>
